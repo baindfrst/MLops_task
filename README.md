@@ -64,13 +64,13 @@ GPU VRAM | ≤ 7.5 GB
 
 ### Установка зависимостей
 ```
-pip install -r requirements.txt
+pip install -r requirements.txt (или requirements_gpu.txt если есть GPU)
 ```
 
 ### Загрузка данных
 
 Добавить свой HF_TOKEN в окружение  
- 
+
 ```
 python -m src.data.load_sberquad
 ```
