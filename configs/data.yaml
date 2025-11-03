@@ -1,0 +1,6 @@
+seed: 42
+output_dir: data/processed
+chunk_tokens: 256
+chunk_overlap: 64
+train_ratio: 0.9
+source: sberquad
