@@ -6,7 +6,7 @@ def setup_logging(
     level: str = "INFO",
     logfile: str | None = None,
     overwrite: bool = True,
-) -> None:
+) -> logging.Logger:
     fmt = "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
 
@@ -28,3 +28,6 @@ def setup_logging(
 
     for noisy in ["urllib3", "transformers", "datasets"]:
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Logging initialized. Level={level}, logfile={logfile}")
+    return logger 
