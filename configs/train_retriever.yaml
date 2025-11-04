@@ -1,12 +1,12 @@
 seed: 42
 output_dir: artifacts/retriever_ru
-base_model: intfloat/multilingual-e5-small
+base_model: DeepPavlov/rubert-base-cased
 train_subset: 7000
 valid_subset: 1000
 lr: 5e-6
-batch_size: 24
+batch_size: 8
 grad_accum: 2
-epochs: 20
+epochs: 10
 max_len_query: 128
 max_len_passage: 412
 negatives_per_query: 8

@@ -28,7 +28,7 @@ def load_retriever():
         return
 
     if not os.path.exists(RETRIEVER_DIR):
-        raise FileNotFoundError("❌ Retriever artifacts not found. Train the model first.")
+        raise FileNotFoundError("Retriever model not found. Train the model first.")
 
     print("Loading retriever...")
 

@@ -94,9 +94,17 @@ python -m src.retriever.eval --model artifacts/retriever_ru
 ```
 pytest -q
 ```
+
+### Построение индексов
+```
+python -m src.retriever.build_index
+```
+
 ### Запуск локального API
 ```
-uvicorn src.api.rag_app_local:app --reload --port 8002
+uvicorn src.api.rag_app:app --host 0.0.0.0 --port 8000 --reload
+
+перейти на http://127.0.0.1:8000/docs
 ```
 
 
