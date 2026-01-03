@@ -1,0 +1,11 @@
+.venv/
+artifacts/
+__pycache__/
+.ipynb_checkpoints/
+*.log
+*.bin
+*.pt
+*.pth
+.env
+.env.*
+*.zip
