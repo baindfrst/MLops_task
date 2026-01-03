@@ -1,0 +1,126 @@
+schema: '2.0'
+stages:
+  load:
+    cmd: python -m src.data.load_sberquad
+    deps:
+    - path: src/data/load_sberquad.py
+      hash: md5
+      md5: 0d95aad0733b2702bf595e0f1885c856
+      size: 1640
+    outs:
+    - path: data/processed/sberquad_dev.jsonl
+      hash: md5
+      md5: 3b97e697c6bef3602dcdada9aee242bb
+      size: 7385150
+    - path: data/processed/sberquad_train.jsonl
+      hash: md5
+      md5: c1f23b5f8f50aa7811a8a26a5f1f047d
+      size: 66084026
+  prepare:
+    cmd: python -m src.data.preprocess --config configs/data.yaml
+    deps:
+    - path: configs/data.yaml
+      hash: md5
+      md5: 7489482200f1219356fa7ff25b139b70
+      size: 106
+    - path: data/processed/sberquad_dev.jsonl
+      hash: md5
+      md5: 3b97e697c6bef3602dcdada9aee242bb
+      size: 7385150
+    - path: data/processed/sberquad_train.jsonl
+      hash: md5
+      md5: c1f23b5f8f50aa7811a8a26a5f1f047d
+      size: 66084026
+    - path: src/data/preprocess.py
+      hash: md5
+      md5: 7d38e6fe734b9745f14ab8f90659cad4
+      size: 4167
+    outs:
+    - path: data/processed/passages.jsonl
+      hash: md5
+      md5: 3768c1150464b1a34106e6387fd9ed67
+      size: 62749565
+    - path: data/processed/retriever_train.jsonl
+      hash: md5
+      md5: 57764991652594f3a5181bc33c152dd2
+      size: 6554623
+    - path: data/processed/retriever_valid.jsonl
+      hash: md5
+      md5: 87274212b7cd639fedceb09e3090a390
+      size: 729601
+  train:
+    cmd: python -m src.retriever.train --config configs/train_retriever.yaml
+    deps:
+    - path: configs/train_retriever.yaml
+      hash: md5
+      md5: 92ebe1ccfe5b75eb8b9d6774ed27611b
+      size: 266
+    - path: data/processed/passages.jsonl
+      hash: md5
+      md5: 3768c1150464b1a34106e6387fd9ed67
+      size: 62749565
+    - path: data/processed/retriever_train.jsonl
+      hash: md5
+      md5: 57764991652594f3a5181bc33c152dd2
+      size: 6554623
+    - path: src/retriever/train.py
+      hash: md5
+      md5: 6a6a3580d2ea552924ed0830de7077f3
+      size: 5511
+    - path: src/retriever/training_utils.py
+      hash: md5
+      md5: 0985c3cf590cc15db2afe072a9e1d2ba
+      size: 1271
+    outs:
+    - path: artifacts/retriever_ru
+      hash: md5
+      md5: 5a2a9b33f3014f3c5be39221afb8089d.dir
+      size: 716663392
+      nfiles: 7
+  build_index:
+    cmd: python -m src.retriever.build_index
+    deps:
+    - path: artifacts/retriever_ru
+      hash: md5
+      md5: 5a2a9b33f3014f3c5be39221afb8089d.dir
+      size: 716663392
+      nfiles: 7
+    - path: data/processed/passages.jsonl
+      hash: md5
+      md5: 3768c1150464b1a34106e6387fd9ed67
+      size: 62749565
+    - path: src/retriever/build_index.py
+      hash: md5
+      md5: 7e95da78dc4d5203adfbdcf837377da6
+      size: 2714
+    outs:
+    - path: artifacts/passages_index.pkl
+      hash: md5
+      md5: e147da8ab0d98bdfcc3daba74501093a
+      size: 142016179
+  evaluate:
+    cmd: python -m src.retriever.eval --model artifacts/retriever_ru --data 
+      data/processed/retriever_valid.jsonl --passages 
+      data/processed/passages.jsonl
+    deps:
+    - path: artifacts/retriever_ru
+      hash: md5
+      md5: 5a2a9b33f3014f3c5be39221afb8089d.dir
+      size: 716663392
+      nfiles: 7
+    - path: data/processed/passages.jsonl
+      hash: md5
+      md5: 3768c1150464b1a34106e6387fd9ed67
+      size: 62749565
+    - path: data/processed/retriever_valid.jsonl
+      hash: md5
+      md5: 87274212b7cd639fedceb09e3090a390
+      size: 729601
+    - path: src/eval/metrics.py
+      hash: md5
+      md5: 5b55dddc8e66d033c56be89155f36e29
+      size: 1816
+    - path: src/retriever/eval.py
+      hash: md5
+      md5: ef0db93d2d4a1bb2855ed59308f14dd7
+      size: 3457
