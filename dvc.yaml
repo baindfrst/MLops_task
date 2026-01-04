@@ -1,0 +1,49 @@
+stages:
+  load:
+    cmd: python -m src.data.load_sberquad
+    deps:
+      - src/data/load_sberquad.py
+    outs:
+      - data/processed/sberquad_train.jsonl
+      - data/processed/sberquad_dev.jsonl
+
+  prepare:
+    cmd: python -m src.data.preprocess --config configs/data.yaml
+    deps:
+      - src/data/preprocess.py
+      - configs/data.yaml
+      - data/processed/sberquad_train.jsonl
+      - data/processed/sberquad_dev.jsonl
+    outs:
+      - data/processed/passages.jsonl
+      - data/processed/retriever_train.jsonl
+      - data/processed/retriever_valid.jsonl
+
+  train:
+    cmd: python -m src.retriever.train --config configs/train_retriever.yaml
+    deps:
+      - src/retriever/train.py
+      - src/retriever/training_utils.py
+      - configs/train_retriever.yaml
+      - data/processed/retriever_train.jsonl
+      - data/processed/passages.jsonl
+    outs:
+      - artifacts/retriever_ru
+
+  build_index:
+    cmd: python -m src.retriever.build_index
+    deps:
+      - src/retriever/build_index.py
+      - artifacts/retriever_ru
+      - data/processed/passages.jsonl
+    outs:
+      - artifacts/passages_index.pkl
+
+  evaluate:
+    cmd: python -m src.retriever.eval --model artifacts/retriever_ru --data data/processed/retriever_valid.jsonl --passages data/processed/passages.jsonl
+    deps:
+      - src/retriever/eval.py
+      - src/eval/metrics.py
+      - artifacts/retriever_ru
+      - data/processed/retriever_valid.jsonl
+      - data/processed/passages.jsonl
