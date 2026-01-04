@@ -5,6 +5,12 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel, get_linear_schedule_with_warmup
 import logging
 
+import mlflow
+from pathlib import Path
+import hashlib
+import time
+
+
 def setup_logging(output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
     log_file = os.path.join(output_dir, "training.log")
@@ -32,6 +38,29 @@ def set_seed(seed: int):
 def read_cfg(path: str):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def sha256_file(path: str) -> str:
+    p = Path(path)
+    if not p.exists():
+        return ""
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def flatten_cfg(cfg: dict, prefix: str = "") -> dict:
+    out = {}
+    for k, v in cfg.items():
+        key = f"{prefix}{k}" if not prefix else f"{prefix}.{k}"
+        if isinstance(v, dict):
+            out.update(flatten_cfg(v, key))
+        else:
+            out[key] = v
+    return out
+
 
 class PairDataset(Dataset):
     def __init__(self, train_file: str, passages_file: str, subset: int | None = None, negs: int = 4):
@@ -94,6 +123,20 @@ def train(cfg_path: str):
     logger = setup_logging(cfg.get("output_dir", "artifacts"))
     logger.info("Learn retr start")
     logger.info(f"Cfg: {cfg}")
+    output_dir = cfg.get("output_dir", "artifacts")
+
+    mlflow_cfg = cfg.get("mlflow", {}) if isinstance(cfg, dict) else {}
+    tracking_uri = mlflow_cfg.get("tracking_uri", "")
+    experiment_name = mlflow_cfg.get("experiment_name", "retriever_training")
+    run_name = mlflow_cfg.get("run_name", f"retriever_{time.strftime('%Y%m%d_%H%M%S')}")
+
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
+        logger.info(f"mlflow tracking: {tracking_uri}")
+    mlflow.set_experiment(experiment_name)
+    mlflow.transformers.autolog()
+
+    dvc_lock_hash = sha256_file("dvc.lock")
 
     set_seed(cfg["seed"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -125,40 +168,90 @@ def train(cfg_path: str):
     step = 0
     logger.info("Start learning now!!!")
 
-    for epoch in range(cfg["epochs"]):
-        logger.info(f"Epoch {epoch + 1}/{cfg['epochs']}")
+    with mlflow.start_run(run_name=run_name):
+        try:
+            mlflow.log_params(flatten_cfg(cfg))
+        except Exception as e:
+            logger.warning(f"MLflow log_params failed (cfg too large or invalid types): {e}")
+            core_params = {k: cfg.get(k) for k in [
+                "seed", "base_model", "lr", "batch_size", "epochs",
+                "negatives_per_query", "max_len_query", "max_len_passage",
+                "precision", "grad_accum", "train_subset", "log_interval"
+            ] if k in cfg}
+            mlflow.log_params(core_params)
 
-        for batch in dl:
-            q, pos, negs = batch
-            q_in = encode(tok, list(q), cfg["max_len_query"]).to(device)
-            p_in = encode(tok, list(pos), cfg["max_len_passage"]).to(device)
-            flat_negs = [n for ns in negs for n in ns]
-            n_in = encode(tok, flat_negs, cfg["max_len_passage"]).to(device)
+        mlflow.set_tag("device", device)
+        mlflow.set_tag("project", "retriever")
+        if dvc_lock_hash:
+            mlflow.set_tag("dvc_lock_sha256", dvc_lock_hash)
 
-            with torch.amp.autocast("cuda", enabled=use_fp16):
-                q_emb = enc(**q_in).last_hidden_state[:, 0, :]
-                p_emb = enc(**p_in).last_hidden_state[:, 0, :]
-                n_emb = enc(**n_in).last_hidden_state[:, 0, :]
-                loss = info_nce(q_emb, p_emb, n_emb) / cfg.get("grad_accum", 1)
+        try:
+            mlflow.log_artifact(cfg_path, artifact_path="configs")
+        except Exception as e:
+            logger.warning(f"MLflow log_artifact(cfg) failed: {e}")
 
-            scaler.scale(loss).backward()
+        for epoch in range(cfg["epochs"]):
+            logger.info(f"Epoch {epoch + 1}/{cfg['epochs']}")
 
-            if (step + 1) % cfg.get("grad_accum", 1) == 0:
-                scaler.step(opt)
-                scaler.update()
-                opt.zero_grad()
-                sch.step()
+            for batch in dl:
+                q, pos, negs = batch
+                q_in = encode(tok, list(q), cfg["max_len_query"]).to(device)
+                p_in = encode(tok, list(pos), cfg["max_len_passage"]).to(device)
+                flat_negs = [n for ns in negs for n in ns]
+                n_in = encode(tok, flat_negs, cfg["max_len_passage"]).to(device)
 
-            if step % cfg["log_interval"] == 0:
-                logger.info(f"Epoch {epoch} | Step {step} | Loss {loss.item():.4f}")
+                with torch.amp.autocast("cuda", enabled=use_fp16):
+                    q_emb = enc(**q_in).last_hidden_state[:, 0, :]
+                    p_emb = enc(**p_in).last_hidden_state[:, 0, :]
+                    n_emb = enc(**n_in).last_hidden_state[:, 0, :]
+                    loss = info_nce(q_emb, p_emb, n_emb) / cfg.get("grad_accum", 1)
 
-            step += 1
+                scaler.scale(loss).backward()
 
-    os.makedirs(cfg["output_dir"], exist_ok=True)
-    enc.save_pretrained(cfg["output_dir"])
-    tok.save_pretrained(cfg["output_dir"])
-    logger.info(f"Model saved {cfg['output_dir']}")
-    logger.info("Train over")
+                if (step + 1) % cfg.get("grad_accum", 1) == 0:
+                    scaler.step(opt)
+                    scaler.update()
+                    opt.zero_grad()
+                    sch.step()
+
+                if step % cfg["log_interval"] == 0:
+                    loss_val = float(loss.item())
+                    logger.info(f"Epoch {epoch} | Step {step} | Loss {loss_val:.4f}")
+                    mlflow.log_metric("train_loss", loss_val, step=step)
+                    mlflow.log_metric("epoch", float(epoch), step=step)
+                    try:
+                        mlflow.log_metric("lr", float(opt.param_groups[0]["lr"]), step=step)
+                    except Exception:
+                        pass
+
+                step += 1
+
+        os.makedirs(output_dir, exist_ok=True)
+        enc.save_pretrained(output_dir)
+        tok.save_pretrained(output_dir)
+        logger.info(f"Model saved {output_dir}")
+        logger.info("Train over")
+
+        try:
+            mlflow.log_artifacts(output_dir, artifact_path="model")
+        except Exception as e:
+            logger.warning(f"MLflow log_artifacts(model_dir) failed: {e}")
+
+        training_log = os.path.join(output_dir, "training.log")
+        if os.path.exists(training_log):
+            try:
+                mlflow.log_artifact(training_log, artifact_path="logs")
+            except Exception as e:
+                logger.warning(f"MLflow log_artifact(training.log) failed: {e}")
+
+        if os.path.exists("dvc.lock"):
+            try:
+                mlflow.log_artifact("dvc.lock", artifact_path="dvc")
+            except Exception as e:
+                logger.warning(f"MLflow log_artifact(dvc.lock) failed: {e}")
+
+        mlflow.log_metric("final_step", float(step))
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
