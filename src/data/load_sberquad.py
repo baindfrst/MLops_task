@@ -2,7 +2,7 @@ import os, json, argparse, random
 from datasets import load_dataset
 from huggingface_hub import login
 login(os.getenv("HF_TOKEN"))
-
+print(os.getenv("HF_TOKEN"))
 def save_jsonl(rows, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

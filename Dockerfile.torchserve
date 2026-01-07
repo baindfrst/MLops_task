@@ -1,0 +1,10 @@
+FROM pytorch/torchserve:latest-gpu
+WORKDIR /home/model-server
+
+COPY requirements.txt /app/req/requirements.txt
+RUN /home/venv/bin/python -m pip install --no-cache-dir -r /app/req/requirements.txt
+
+COPY model-store /home/model-server/model-store
+COPY torchserve/config.properties /home/model-server/config.properties
+
+CMD ["torchserve", "--start", "--ts-config", "config.properties", "--model-store", "model-store", "--models", "mymodel=mymodel.mar", "--foreground"]

@@ -4,6 +4,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel, get_linear_schedule_with_warmup
 import logging
+import subprocess
+
 
 import mlflow
 from pathlib import Path
@@ -49,6 +51,13 @@ def sha256_file(path: str) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+def git_commit() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        return ""
+
 
 
 def flatten_cfg(cfg: dict, prefix: str = "") -> dict:
@@ -137,6 +146,9 @@ def train(cfg_path: str):
     mlflow.transformers.autolog()
 
     dvc_lock_hash = sha256_file("dvc.lock")
+    dvc_yaml_hash = sha256_file("dvc.yaml")
+    git_hash = git_commit()
+
 
     set_seed(cfg["seed"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -167,6 +179,7 @@ def train(cfg_path: str):
     enc.train()
     step = 0
     logger.info("Start learning now!!!")
+    
 
     with mlflow.start_run(run_name=run_name):
         try:
@@ -184,6 +197,11 @@ def train(cfg_path: str):
         mlflow.set_tag("project", "retriever")
         if dvc_lock_hash:
             mlflow.set_tag("dvc_lock_sha256", dvc_lock_hash)
+        if dvc_yaml_hash:
+            mlflow.set_tag("dvc_yaml_sha256", dvc_yaml_hash)
+        if git_hash:
+            mlflow.set_tag("git_commit", git_hash)
+
 
         try:
             mlflow.log_artifact(cfg_path, artifact_path="configs")
@@ -243,12 +261,17 @@ def train(cfg_path: str):
                 mlflow.log_artifact(training_log, artifact_path="logs")
             except Exception as e:
                 logger.warning(f"MLflow log_artifact(training.log) failed: {e}")
-
+        
         if os.path.exists("dvc.lock"):
             try:
                 mlflow.log_artifact("dvc.lock", artifact_path="dvc")
             except Exception as e:
                 logger.warning(f"MLflow log_artifact(dvc.lock) failed: {e}")
+        if os.path.exists("dvc.yaml"):
+            try:
+                mlflow.log_artifact("dvc.yaml", artifact_path="dvc")
+            except Exception as e:
+                logger.warning(f"MLflow log_artifact(dvc.yaml) failed: {e}")
 
         mlflow.log_metric("final_step", float(step))
 
