@@ -1,10 +1,28 @@
 FROM pytorch/torchserve:latest-gpu
+
 WORKDIR /home/model-server
 
 COPY requirements.txt /app/req/requirements.txt
 RUN /home/venv/bin/python -m pip install --no-cache-dir -r /app/req/requirements.txt
 
-COPY model-store /home/model-server/model-store
+RUN mkdir -p /home/model-server/torchserve_bundle
+COPY model-store/model.pt /home/model-server/torchserve_bundle/model.pt
+COPY torchserve/handler.py /home/model-server/torchserve_bundle/handler.py
+COPY artifacts/retriever_ru /home/model-server/torchserve_bundle/retriever_ru
+COPY artifacts/passages_index.pkl /home/model-server/torchserve_bundle/passages_index.pkl
+COPY data/processed/passages.jsonl /home/model-server/torchserve_bundle/passages.jsonl
+
+RUN mkdir -p /home/model-server/model-store && \
+    cd /home/model-server/torchserve_bundle && \
+    torch-model-archiver \
+      --model-name mymodel \
+      --version 1.0 \
+      --serialized-file model.pt \
+      --handler handler.py \
+      --extra-files "retriever_ru,passages_index.pkl,passages.jsonl" \
+      --export-path /home/model-server/model-store \
+      --force
+
 COPY torchserve/config.properties /home/model-server/config.properties
 
 CMD ["torchserve", "--start", "--ts-config", "config.properties", "--model-store", "model-store", "--models", "mymodel=mymodel.mar", "--foreground"]
