@@ -24,6 +24,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
+          pip install "dvc[gdrive]"
+
+      - name: Configure Google Drive credentials for DVC (service account)
+        shell: bash
+        run: |
+          echo '${{ secrets.GDRIVE_CREDENTIALS_DATA }}' > gdrive-sa.json
+
+          cat > gdrive-settings.yaml << 'YAML'
+          client_config_backend: service
+          service_config:
+            client_json_file_path: gdrive-sa.json
+
+          save_credentials: false
+          save_credentials_backend: file
+          YAML
+
+      - name: DVC pull data
+        shell: bash
+        env:
+          PYDRIVE2_SETTINGS: ${{ github.workspace }}/gdrive-settings.yaml
+        run: |
+          dvc version
+          dvc remote list
+          dvc pull -v
 
       - name: Run tests
         run: pytest -q
