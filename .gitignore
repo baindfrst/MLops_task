@@ -11,6 +11,10 @@ __pycache__/
 *.zip
 mlruns/
 
+gdrive-sa.json
+gdrive-settings.yaml
+
+
 !*.dvc
 !artifacts/*.dvc
 !.dvc/
