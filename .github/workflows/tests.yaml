@@ -12,42 +12,50 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: Install dependencies
+        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
           pip install "dvc[gdrive]"
 
-      - name: Configure Google Drive credentials for DVC (service account)
+      - name: Verify DVC installation
         shell: bash
         run: |
-          echo '${{ secrets.GDRIVE_CREDENTIALS_DATA }}' > gdrive-sa.json
-
-          cat > gdrive-settings.yaml << 'YAML'
-          client_config_backend: service
-          service_config:
-            client_json_file_path: gdrive-sa.json
-
-          save_credentials: false
-          save_credentials_backend: file
-          YAML
-
-      - name: DVC pull data
-        shell: bash
-        env:
-          PYDRIVE2_SETTINGS: ${{ github.workspace }}/gdrive-settings.yaml
-        run: |
-          dvc version
+          dvc --version
           dvc remote list
+
+      - name: Write Google Drive service account key
+        shell: bash
+        run: |
+          printf '%s' '${{ secrets.GDRIVE_CREDENTIALS_DATA }}' > gdrive-sa.json
+
+          test -s gdrive-sa.json
+
+      - name: Configure DVC remote for CI (local config)
+        shell: bash
+        run: |
+          dvc remote modify --local myremote gdrive_use_service_account true
+
+          dvc remote modify --local myremote gdrive_service_account_json_file_path gdrive-sa.json
+
+          dvc remote list
+          dvc config --local --list
+
+      - name: Pull data with DVC
+        shell: bash
+        run: |
           dvc pull -v
 
       - name: Run tests
-        run: pytest -q
+        shell: bash
+        run: |
+          pytest -q
