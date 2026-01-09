@@ -9,3 +9,8 @@ __pycache__/
 .env
 .env.*
 *.zip
+mlruns/
+
+!*.dvc
+!artifacts/*.dvc
+!.dvc/
