@@ -8,3 +8,9 @@
     gdrive_client_id = 349341923432-t3imk3ibt1udspoje214lbmdhn5lk1a7.apps.googleusercontent.com
     gdrive_client_secret = <tmp>
     gdrive_use_service_account = true
+['remote "myremote_s3"']
+    url = s3://dvcstore
+    endpointurl = http://127.0.0.1:9000
+    access_key_id = minioadmin
+    secret_access_key = minioadmin123
+    use_ssl = false
