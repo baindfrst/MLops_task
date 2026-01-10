@@ -22,40 +22,42 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
-          pip install "dvc[gdrive]"
+          pip install "dvc[s3]"
 
-      - name: Verify DVC installation
+      - name: Verify DVC + remotes
         shell: bash
         run: |
+          set -euo pipefail
           dvc --version
           dvc remote list
-
-      - name: Write Google Drive service account key
+      - name: Configure MinIO remote for CI (local config only)
         shell: bash
+        env:
+          MINIO_ENDPOINT_URL: ${{ secrets.MINIO_ENDPOINT_URL }}
         run: |
-          printf '%s' '${{ secrets.GDRIVE_CREDENTIALS_DATA }}' > gdrive-sa.json
-
-          test -s gdrive-sa.json
-
-      - name: Configure DVC remote for CI (local config)
-        shell: bash
-        run: |
-          dvc remote modify --local myremote gdrive_use_service_account true
-
-          dvc remote modify --local myremote gdrive_service_account_json_file_path gdrive-sa.json
-
-          dvc remote list
+          set -euo pipefail
+          dvc remote list | grep -E '^minio\s' || (echo "Remote 'minio' not found. Check .dvc/config" && exit 1)
+          dvc remote modify --local minio endpointurl "${MINIO_ENDPOINT_URL}"
+          dvc remote modify --local minio use_ssl false
+          dvc remote modify --local minio s3_use_multipart_upload true
           dvc config --local --list
 
-      - name: Pull data with DVC
+      - name: DVC pull (datasets/models)
         shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
         run: |
+          set -euo pipefail
           dvc pull -v
 
       - name: Run tests
         shell: bash
         run: |
+          set -euo pipefail
           pytest -q

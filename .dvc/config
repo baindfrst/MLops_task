@@ -1,16 +1,6 @@
 [core]
-    remote = myremote
-['remote "localstorage"']
-    url = D:\MLops_stor
-['remote "myremote"']
-    url = gdrive://1vD7JNQW0qO6MRlN89O9M3BYM-qCHcRzA
-    gdrive_acknowledge_abuse = true
-    gdrive_client_id = 349341923432-t3imk3ibt1udspoje214lbmdhn5lk1a7.apps.googleusercontent.com
-    gdrive_client_secret = <tmp>
-    gdrive_use_service_account = true
-['remote "myremote_s3"']
-    url = s3://dvcstore
-    endpointurl = http://127.0.0.1:9000
-    access_key_id = minioadmin
-    secret_access_key = minioadmin123
+    remote = minio
+['remote "minio"']
+    url = s3://dvcstor/art
+    endpointurl = http://94.183.187.106:9000
     use_ssl = false
