@@ -40,10 +40,12 @@ jobs:
           MINIO_ENDPOINT_URL: ${{ secrets.MINIO_ENDPOINT_URL }}
         run: |
           set -euo pipefail
+
           dvc remote list | grep -E '^minio\s' || (echo "Remote 'minio' not found. Check .dvc/config" && exit 1)
+
           dvc remote modify --local minio endpointurl "${MINIO_ENDPOINT_URL}"
           dvc remote modify --local minio use_ssl false
-          dvc remote modify --local minio s3_use_multipart_upload true
+
           dvc config --local --list
 
       - name: DVC pull (datasets/models)
