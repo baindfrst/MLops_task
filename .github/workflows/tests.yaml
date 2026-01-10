@@ -24,9 +24,12 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
+
           pip install -r requirements.txt
           pip install pytest
-          pip install "dvc[s3]"
+
+          pip install "dvc[s3]==3.66.1" boto3 s3fs
+
 
       - name: Verify DVC + remotes
         shell: bash
