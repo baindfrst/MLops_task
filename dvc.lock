@@ -65,8 +65,8 @@ stages:
       size: 6554623
     - path: src/retriever/train.py
       hash: md5
-      md5: 6a6a3580d2ea552924ed0830de7077f3
-      size: 5511
+      md5: 29110c299215adeccf8358640d33bd6f
+      size: 9571
     - path: src/retriever/training_utils.py
       hash: md5
       md5: 0985c3cf590cc15db2afe072a9e1d2ba
@@ -74,7 +74,7 @@ stages:
     outs:
     - path: artifacts/retriever_ru
       hash: md5
-      md5: 5a2a9b33f3014f3c5be39221afb8089d.dir
+      md5: 96ebffbfa28a5341179cc65feb64fc8d.dir
       size: 716663392
       nfiles: 7
   build_index:
@@ -124,3 +124,20 @@ stages:
       hash: md5
       md5: ef0db93d2d4a1bb2855ed59308f14dd7
       size: 3457
+  export_torchscript:
+    cmd: python scripts/export_torchscript.py
+    deps:
+    - path: artifacts/retriever_ru
+      hash: md5
+      md5: 96ebffbfa28a5341179cc65feb64fc8d.dir
+      size: 716663392
+      nfiles: 7
+    - path: scripts/export_torchscript.py
+      hash: md5
+      md5: ddde987e98ab726489047ee3a10ae127
+      size: 1429
+    outs:
+    - path: model-store/model.pt
+      hash: md5
+      md5: b364fd6d48aa013804cee501662dc754
+      size: 711776794

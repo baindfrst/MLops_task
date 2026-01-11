@@ -39,6 +39,14 @@ stages:
     outs:
       - artifacts/passages_index.pkl
 
+  export_torchscript:
+    cmd: python scripts/export_torchscript.py
+    deps:
+      - scripts/export_torchscript.py
+      - artifacts/retriever_ru
+    outs:
+      - model-store/model.pt
+
   evaluate:
     cmd: python -m src.retriever.eval --model artifacts/retriever_ru --data data/processed/retriever_valid.jsonl --passages data/processed/passages.jsonl
     deps:
