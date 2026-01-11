@@ -59,7 +59,7 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
         run: |
           set -euo pipefail
-          dvc pull -v
+          dvc pull -v --exclude model-store/model.pt
 
       - name: Run tests
         shell: bash
