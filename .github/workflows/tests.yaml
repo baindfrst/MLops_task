@@ -28,38 +28,20 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
-          pip install "dvc[s3]==3.66.1" boto3 s3fs
-
-
-      - name: Verify DVC + remotes
-        shell: bash
-        run: |
-          set -euo pipefail
-          dvc --version
-          dvc remote list
-      - name: Configure MinIO remote for CI (local config only)
+      - name: DVC
         shell: bash
         env:
           MINIO_ENDPOINT_URL: ${{ secrets.MINIO_ENDPOINT_URL }}
-        run: |
-          set -euo pipefail
-
-          dvc remote list | grep -E '^minio\s' || (echo "Remote 'minio' not found. Check .dvc/config" && exit 1)
-
-          dvc remote modify --local minio endpointurl "${MINIO_ENDPOINT_URL}"
-          dvc remote modify --local minio use_ssl false
-
-          dvc config --local --list
-
-      - name: DVC pull (datasets/models)
-        shell: bash
-        env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
           set -euo pipefail
-          dvc pull -v --exclude model-store/model.pt
+
+          dvc remote list | grep -E '^minio\s' || (echo "Remote 'minio' not found. Check .dvc/config" && exit 1)
+          dvc remote modify --local minio endpointurl "${MINIO_ENDPOINT_URL}"
+          dvc remote modify --local minio use_ssl false
+          dvc pull -v data/processed/passages.jsonl data/processed/retriever_train.jsonl data/processed/retriever_valid.jsonl artifacts/retriever_ru artifacts/passages_index.pkl
 
       - name: Run tests
         shell: bash
